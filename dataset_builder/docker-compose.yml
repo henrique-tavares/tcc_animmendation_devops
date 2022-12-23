@@ -1,0 +1,20 @@
+version: '3.9'
+
+services:
+    dataset_builder:
+        image: ghcr.io/henrique-tavares/tcc_animmendation_dataset_builder
+
+    sftp_server:
+        image: atmoz/sftp:alpine
+        expose:
+            - 22
+        volumes:
+            - '../data:/home/animmendation/data'
+        command: animmendation:${SFTP_PASSWORD}:1000
+
+    proxypool:
+        image: evait/multitor:latest
+        expose:
+            - 16379
+        environment:
+            - TOR_INSTANCES=500

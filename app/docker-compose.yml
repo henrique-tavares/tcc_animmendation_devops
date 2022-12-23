@@ -1,0 +1,84 @@
+version: '3.9'
+
+services:
+    frontend:
+        image: ghcr.io/henrique-tavares/tcc_animmendation_frontend
+        expose:
+            - 80
+
+    backend:
+        image: ghcr.io/henrique-tavares/tcc_animmendation_backend
+        env_file: ../.env
+        volumes:
+            - ..:/home/animmendation/tcc_animmendation/backend
+            - ~/.ssh:/home/animmendation/.ssh
+            - datasets:/home/animmendation/tcc_animmendation/backend/datasets
+        expose:
+            - 4000
+        depends_on:
+            redis:
+                condition: service_started
+            db_backend:
+                condition: service_healthy
+
+    db_backend:
+        image: postgres:15
+        environment:
+            POSTGRES_USERNAME: ${DB_BACKEND_USERNAME}
+            POSTGRES_PASSWORD: ${DB_BACKEND_PASSWORD}
+            POSTGRES_DB: ${DB_BACKEND_NAME}
+        volumes:
+            - dbdata_backend:/var/lib/postgresql/data
+            - datasets:/datasets
+        healthcheck:
+            test: pg_isready -U $$POSTGRES_USERNAME  -d $$POSTGRES_DB
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 5s
+
+    translator:
+        build:
+            dockerfile: Dockerfile.libretranslate
+            args:
+                models: en,pt
+        restart: unless-stopped
+        expose:
+            - 5000
+        command: --disable-files-translation --disable-web-ui
+
+    redis:
+        image: redis/redis-stack-server:latest
+        expose:
+            - 6379
+        environment:
+            REDIS_ARGS: "--requirepass ${REDIS_PASSWORD}"
+
+    recommendation:
+        image: ghcr.io/henrique-tavares/tcc_animmendation_recommendation
+        expose:
+            - 50051
+
+    db_recommendation:
+        image: postgres:15
+        environment:
+            POSTGRES_USERNAME: ${DB_RECOMMENDATION_USERNAME}
+            POSTGRES_PASSWORD: ${DB_RECOMMENDATION_PASSWORD}
+            POSTGRES_DB: ${DB_RECOMMENDATION_NAME}
+        volumes:
+            - dbdata_recommendation:/var/lib/postgresql/data
+        healthcheck:
+            test: pg_isready -U $$POSTGRES_USERNAME  -d $$POSTGRES_DB
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 5s
+
+volumes:
+    datasets:
+    dbdata_backend:
+        external: true
+        name: tcc_animmendation_backend_devcontainer_dbdata
+    dbdata_recommendation:
+        external: true
+        name: tcc_animmendation_recommendation_devcontainer_dbdata_recommendation
